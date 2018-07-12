@@ -1,0 +1,355 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "This template creates a VPC infrastructure for a multi-AZ, multi-tier deployment of a Windows based Application infrastructure. It will deploy a Remote Desktop Gateway and manage NAT gateways or NAT instances into the public subnet for each Availability Zone. **WARNING** This template creates Amazon EC2 Windows instance and related resources. You will be billed for the AWS resources used if you create a stack from this template.",
+    "Metadata": {
+        "AWS::CloudFormation::Interface": {
+            "ParameterGroups": [
+                {
+                    "Label": {
+                        "default": "Amazon EC2 Configuration"
+                    },
+                    "Parameters": [
+                        "KeyPairName"
+                    ]
+                }
+            ],
+            "ParameterLabels": {
+                "KeyPairName": {
+                    "default": "Key Pair Name"
+                }
+            }
+        }
+    },
+    "Parameters": {
+        "KeyPairName": {
+            "Description": "Public/private key pairs allow you to securely connect to your instance after it launches",
+            "Type": "AWS::EC2::KeyPair::KeyName"
+        },
+        "AvailabilityZones": {
+            "Description": "List of Availability Zones to use for the subnets in the VPC. Note: The logical order is preserved.",
+            "Type": "List<AWS::EC2::AvailabilityZone::Name>"
+        }
+    },
+    "Rules": {
+    },
+    "Mappings": {
+        "AWSAMIRegionMap": {
+            "AMI": {
+                "WS2016FULLBASE": "Windows_Server-2016-English-Full-Base-2018.06.13"
+            },
+            "ap-northeast-1": {
+                "WS2016FULLBASE": "ami-120cc36d"
+            },
+            "ap-northeast-2": {
+                "WS2016FULLBASE": "ami-7969c317"
+            },
+            "ap-south-1": {
+                "WS2016FULLBASE": "ami-5f95bd30"
+            },
+            "ap-southeast-1": {
+                "WS2016FULLBASE": "ami-053d3a79"
+            },
+            "ap-southeast-2": {
+                "WS2016FULLBASE": "ami-42f02f20"
+            },
+            "ca-central-1": {
+                "WS2016FULLBASE": "ami-140b8870"
+            },
+            "eu-central-1": {
+                "WS2016FULLBASE": "ami-63f5c688"
+            },
+            "eu-west-1": {
+                "WS2016FULLBASE": "ami-987a76e1"
+            },
+            "eu-west-2": {
+                "WS2016FULLBASE": "ami-479b7520"
+            },
+            "eu-west-3": {
+                "WS2016FULLBASE": "ami-1511a068"
+            },
+            "sa-east-1": {
+                "WS2016FULLBASE": "ami-ff6e3593"
+            },
+            "us-east-1": {
+                "WS2016FULLBASE": "ami-0327667c"
+            },
+            "us-east-2": {
+                "WS2016FULLBASE": "ami-3bfac45e"
+            },
+            "us-west-1": {
+                "WS2016FULLBASE": "ami-b236d2d1"
+            },
+            "us-west-2": {
+                "WS2016FULLBASE": "ami-3703414f"
+            }
+        }
+    },
+    "Conditions": {
+    },
+    "Resources": {
+        "VPCNEW": {
+            "Type": "AWS::EC2::VPC",
+            "Properties": {
+                "CidrBlock":                     "10.0.0.0/16",
+                
+                "EnableDnsSupport": "true",
+                "EnableDnsHostnames": "true",
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Ref": "AWS::StackName"
+                        }
+                    }
+                ]
+            }
+        },
+        "InternetGateway": {
+            "Type": "AWS::EC2::InternetGateway",
+            "Properties": {
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Ref": "AWS::StackName"
+                        }
+                    }
+                ]
+            }
+        },
+        "VPCGatewayAttachment": {
+            "Type": "AWS::EC2::VPCGatewayAttachment",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "VPCNEW"
+                },
+                "InternetGatewayId": {
+                    "Ref": "InternetGateway"
+                }
+            }
+        },
+        "PrivateSubnet1A": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "VPCNEW"
+                },
+                "CidrBlock": 
+                    "10.0.1.0/24",
+                    "AvailabilityZone": {
+                        "Fn::Select": [
+                            "0",
+                            {
+                                "Ref": "AvailabilityZones"
+                            }
+                        ]
+                    },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "Private subnet 1A"
+                    }
+                ]
+                
+            }
+        },
+        "PublicSubnet1": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "VPCNEW"
+                },
+                "CidrBlock": "10.0.0.0/24",
+                "AvailabilityZone": {
+                    "Fn::Select": [
+                        "0",
+                        {
+                            "Ref": "AvailabilityZones"
+                        }
+                    ]
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "Public subnet 1"
+                    }
+                ],
+                "MapPublicIpOnLaunch": true
+            }
+        },        "PrivateSubnet1ARouteTable": {
+            "Type": "AWS::EC2::RouteTable",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "VPCNEW"
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "Private subnet 1A"
+                    },
+                    {
+                        "Key": "Network",
+                        "Value": "Private"
+                    }
+                ]
+            }
+        },        "PublicSubnetRouteTable": {
+            "Type": "AWS::EC2::RouteTable",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "VPCNEW"
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "Public Subnets"
+                    },
+                    {
+                        "Key": "Network",
+                        "Value": "Public"
+                    }
+                ]
+            }
+        },
+        "PublicSubnetRoute": {
+            "DependsOn": "VPCGatewayAttachment",
+            "Type": "AWS::EC2::Route",
+            "Properties": {
+                "RouteTableId": {
+                    "Ref": "PublicSubnetRouteTable"
+                },
+                "DestinationCidrBlock": "0.0.0.0/0",
+                "GatewayId": {
+                    "Ref": "InternetGateway"
+                }
+            }
+        },        "PublicSubnet1RouteTableAssociation": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+                "SubnetId": {
+                    "Ref": "PublicSubnet1"
+                },
+                "RouteTableId": {
+                    "Ref": "PublicSubnetRouteTable"
+                }
+            }
+        },
+        "HOLSG": {
+            "Type": "AWS::EC2::SecurityGroup",
+            "Properties": {
+                "GroupDescription": "Enable RDP access from the Internet",
+                "VpcId": {
+                    "Ref": "VPCNEW"
+                },
+                "SecurityGroupIngress": [
+                    {
+                        "IpProtocol": "tcp",
+                        "FromPort": "3389",
+                        "ToPort": "3389",
+                        "CidrIp": "0.0.0.0/0"
+                    }
+                ]
+            }
+        },        
+        "HOLSGIngress": {
+            "Type": "AWS::EC2::SecurityGroupIngress",
+            "Properties": {
+                "GroupId": {
+                    "Ref":"HOLSG"
+                  },
+                "IpProtocol": "tcp",
+                "FromPort": "0",
+                "ToPort": "65535",
+                "SourceSecurityGroupId": {
+                    "Ref": "HOLSG"
+                }
+            }
+        },
+        "PrivateServer": {
+            "Type": "AWS::EC2::Instance",
+            
+            "Properties": {
+                "ImageId": {
+                    "Fn::FindInMap": [
+                        "AWSAMIRegionMap",
+                        {
+                            "Ref": "AWS::Region"
+                        },
+                        "WS2016FULLBASE"
+                    ]
+                },
+                "InstanceType": "t2.micro",
+                "NetworkInterfaces": [
+                    {
+                        "DeleteOnTermination": "true",
+                        "DeviceIndex": 0,
+                        "SubnetId": {
+
+                                    "Ref": "PrivateSubnet1A"
+                                },
+                                "GroupSet": [
+                                    {
+                                        "Ref": "HOLSG"
+                                    }
+                                ]
+
+                        
+
+                    }
+                ],
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "HOL-private"
+                    }
+                ],
+
+                "KeyName": {
+                    "Ref": "KeyPairName"
+                }
+            }
+        },        "PublicServer": {
+            "Type": "AWS::EC2::Instance",
+            
+            "Properties": {
+                "ImageId": {
+                    "Fn::FindInMap": [
+                        "AWSAMIRegionMap",
+                        {
+                            "Ref": "AWS::Region"
+                        },
+                        "WS2016FULLBASE"
+                    ]
+                },
+                "InstanceType": "t2.micro",
+                "NetworkInterfaces": [
+                    {
+                        "DeleteOnTermination": "true",
+                        "DeviceIndex": 0,
+                        "SubnetId": {
+
+                                    "Ref": "PublicSubnet1"
+                                },
+                                "GroupSet": [
+                                    {
+                                        "Ref": "HOLSG"
+                                    }
+                                ]
+                        
+
+                    }
+                ],
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "HOL-public"
+                    }
+                ],
+
+                "KeyName": {
+                    "Ref": "KeyPairName"
+                }
+            }
+        }
+   }
+}
